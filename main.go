@@ -8,17 +8,26 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/render"
+	"github.com/go-playground/validator/v10"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	pb "github.com/ssengalanto/grpc-gateway/proto"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
+
+// GreetReq is a separate structure for validation
+type GreetReq struct {
+	Name string `validate:"required,min=5"`
+}
 
 type server struct {
 	pb.UnimplementedGreeterServer
@@ -30,11 +39,42 @@ func NewServer() *server {
 }
 
 func (s *server) Greet(ctx context.Context, in *pb.GreetRequest) (*pb.GreetReply, error) {
+	// Convert pb.GreetRequest to GreetReq for validation
+	req := mapToGreetReq(in)
+
+	// Validate the GreetReq
+	if err := validateGreetReq(req); err != nil {
+		// Convert validation errors into a gRPC status error
+		return nil, status.Error(codes.InvalidArgument, formatValidationErrors(err))
+	}
+
+	// Your existing logic
 	return &pb.GreetReply{Message: in.Name + " world"}, nil
 }
 
-func (s *server) Check(ctx context.Context, in *pb.HealthCheckRequest) (*pb.HealthCheckResponse, error) {
-	return &pb.HealthCheckResponse{Serving: true}, nil
+// GreetReq to pb.GreetRequest conversion
+func mapToGreetReq(in *pb.GreetRequest) *GreetReq {
+	return &GreetReq{
+		Name: in.Name,
+	}
+}
+
+// validateGreetReq validates the GreetReq using validator v10
+func validateGreetReq(req *GreetReq) error {
+	validate := validator.New()
+	if err := validate.Struct(req); err != nil {
+		return err
+	}
+	return nil
+}
+
+// formatValidationErrors formats validation errors into a string
+func formatValidationErrors(err error) string {
+	var errors []string
+	for _, err := range err.(validator.ValidationErrors) {
+		errors = append(errors, err.Field()+" is "+err.Error())
+	}
+	return strings.Join(errors, "; ")
 }
 
 func main() {
