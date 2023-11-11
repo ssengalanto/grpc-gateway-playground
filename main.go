@@ -7,14 +7,13 @@ import (
 	"net/http"
 	"path/filepath"
 
+	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/render"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/status"
-
 	pb "github.com/ssengalanto/grpc-gateway/proto"
-	health "google.golang.org/grpc/health/grpc_health_v1"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type server struct {
@@ -25,17 +24,12 @@ func NewServer() *server {
 	return &server{}
 }
 
-func (s *server) SayHello(ctx context.Context, in *pb.HelloRequest) (*pb.HelloReply, error) {
-	return &pb.HelloReply{Message: in.Name + " world"}, nil
+func (s *server) Greet(ctx context.Context, in *pb.GreetRequest) (*pb.GreetReply, error) {
+	return &pb.GreetReply{Message: in.Name + " world"}, nil
 }
 
-func (s *server) Check(ctx context.Context, in *health.HealthCheckRequest) (*health.HealthCheckResponse, error) {
-	return &health.HealthCheckResponse{Status: health.HealthCheckResponse_SERVING}, nil
-}
-
-func (s *server) Watch(in *health.HealthCheckRequest, _ health.Health_WatchServer) error {
-	// Example of how to register both methods but only implement the Check method.
-	return status.Error(codes.Unimplemented, "unimplemented")
+func (s *server) Check(ctx context.Context, in *pb.HealthCheckRequest) (*pb.HealthCheckResponse, error) {
+	return &pb.HealthCheckResponse{Serving: true}, nil
 }
 
 func main() {
@@ -49,7 +43,7 @@ func main() {
 	s := grpc.NewServer()
 	// Attach the Greeter service to the server
 	pb.RegisterGreeterServer(s, &server{})
-	health.RegisterHealthServer(s, &server{})
+	pb.RegisterHealthServer(s, &server{})
 
 	// Serve gRPC server
 	log.Println("Serving gRPC on 0.0.0.0:8080")
@@ -71,30 +65,41 @@ func main() {
 		log.Fatalf("Failed to dial server: %v", err)
 	}
 
-	healthClient := health.NewHealthClient(conn)
-
-	gwmux := runtime.NewServeMux(runtime.WithHealthzEndpoint(healthClient))
+	gwmux := runtime.NewServeMux()
 	// Register Greeter
 	if err := pb.RegisterGreeterHandler(context.Background(), gwmux, conn); err != nil {
 		log.Fatalf("Failed to register gateway: %v", err)
 	}
 
-	// Serve the Swagger JSON file
-	swaggerFile := filepath.Join(".", "gen", "openapiv2", "service.swagger.json")
+	if err := pb.RegisterHealthHandler(context.Background(), gwmux, conn); err != nil {
+		log.Fatalf("Failed to register gateway: %v", err)
+	}
 
+	// Create a new Chi router
+	r := chi.NewRouter()
+
+	// Use Chi middleware
+	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
+	r.Use(render.SetContentType(render.ContentTypeJSON))
+
+	// Mount the gRPC HTTP gateway to the root
+	r.Mount("/", gwmux)
+
+	swaggerFile := filepath.Join(".", "gen", "openapiv2", "service.swagger.json")
 	// mount a path to expose the generated OpenAPI specification on disk
-	gwmux.HandlePath("GET", "/docs/swagger.json", func(w http.ResponseWriter, r *http.Request, pathParams map[string]string) {
+	r.Get("/docs/swagger.json", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, swaggerFile)
 	})
 
+	swaggerDir := filepath.Join(".", "swagger-ui")
 	// mount the Swagger UI that uses the OpenAPI specification path above
-	gwmux.HandlePath("GET", "/docs/*", func(w http.ResponseWriter, r *http.Request, pathParams map[string]string) {
-		http.StripPrefix("/docs", http.FileServer(http.Dir("./swagger-ui"))).ServeHTTP(w, r)
-	})
-
+	r.Get("/docs/*", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.StripPrefix("/docs", http.FileServer(http.Dir(swaggerDir))).ServeHTTP(w, r)
+	}))
 	gwServer := &http.Server{
 		Addr:    ":8090",
-		Handler: gwmux,
+		Handler: r,
 	}
 
 	log.Println("Serving gRPC-Gateway on http://0.0.0.0:8090")

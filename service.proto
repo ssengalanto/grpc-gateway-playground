@@ -3,37 +3,42 @@ package service.v1;
 option go_package = "github.com/ssengalanto/grpc-gateway/service/v1";
 
 import "google/api/annotations.proto";
+import "google/api/field_behavior.proto";
 
+// Greeter service provides a simple greeting service.
 service Greeter {
-  rpc SayHello (HelloRequest) returns (HelloReply) {
+  // Sends a greeting message.
+  //
+  // Sends a friendly greeting message.
+  rpc Greet (GreetRequest) returns (GreetReply) {
     option (google.api.http) = {
-      post: "/v1/example/echo"
+      post: "/v1/greet"
       body: "*"
     };
   }
 }
 
-// The request message containing the user's name
-message HelloRequest {
-  string name = 1;
+// HelloRequest represents the request message for the SayHello method.
+message GreetRequest {
+  // The name of the person to greet.
+  string name = 1 [(google.api.field_behavior) = REQUIRED];
 }
 
-// The response message containing the greetings
-message HelloReply {
+// HelloReply represents the response message for the SayHello method.
+message GreetReply {
+  // The greeting message.
   string message = 1;
 }
 
+
 // Health service
 service Health {
+  // Check the health of the service
+  //
+  // Returns the health status of the service.
   rpc Check(HealthCheckRequest) returns (HealthCheckResponse) {
     option (google.api.http) = {
       get: "/health"
-    };
-  }
-
-  rpc Watch(HealthCheckRequest) returns (stream HealthCheckResponse) {
-    option (google.api.http) = {
-      get: "/watch"
     };
   }
 }

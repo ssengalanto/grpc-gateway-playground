@@ -13,6 +13,8 @@
   "paths": {
     "/health": {
       "get": {
+        "summary": "Check the health of the service",
+        "description": "Returns the health status of the service.",
         "operationId": "Health_Check",
         "responses": {
           "200": {
@@ -33,14 +35,16 @@
         ]
       }
     },
-    "/v1/example/echo": {
+    "/v1/greet": {
       "post": {
-        "operationId": "Greeter_SayHello",
+        "summary": "Sends a greeting message.",
+        "description": "Sends a friendly greeting message.",
+        "operationId": "Greeter_Greet",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/v1HelloReply"
+              "$ref": "#/definitions/v1GreetReply"
             }
           },
           "default": {
@@ -56,43 +60,12 @@
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/v1HelloRequest"
+              "$ref": "#/definitions/v1GreetRequest"
             }
           }
         ],
         "tags": [
           "Greeter"
-        ]
-      }
-    },
-    "/watch": {
-      "get": {
-        "operationId": "Health_Watch",
-        "responses": {
-          "200": {
-            "description": "A successful response.(streaming responses)",
-            "schema": {
-              "type": "object",
-              "properties": {
-                "result": {
-                  "$ref": "#/definitions/v1HealthCheckResponse"
-                },
-                "error": {
-                  "$ref": "#/definitions/rpcStatus"
-                }
-              },
-              "title": "Stream result of v1HealthCheckResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "tags": [
-          "Health"
         ]
       }
     }
@@ -128,6 +101,26 @@
         }
       }
     },
+    "v1GreetReply": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string",
+          "description": "The greeting message."
+        }
+      },
+      "description": "HelloReply represents the response message for the SayHello method."
+    },
+    "v1GreetRequest": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the person to greet."
+        }
+      },
+      "description": "HelloRequest represents the request message for the SayHello method."
+    },
     "v1HealthCheckResponse": {
       "type": "object",
       "properties": {
@@ -135,24 +128,6 @@
           "type": "boolean"
         }
       }
-    },
-    "v1HelloReply": {
-      "type": "object",
-      "properties": {
-        "message": {
-          "type": "string"
-        }
-      },
-      "title": "The response message containing the greetings"
-    },
-    "v1HelloRequest": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string"
-        }
-      },
-      "title": "The request message containing the user's name"
     }
   }
 }
