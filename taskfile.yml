@@ -1,0 +1,36 @@
+version: "3"
+
+dotenv: [".env"]
+
+includes:
+  go:
+    taskfile: ./taskfiles/golang.yml
+    vars:
+      PACKAGES:
+        sh: go list ./...
+
+tasks:
+  default:
+    desc: List all the available tasks.
+    cmds:
+      - task --list
+    silent: true
+
+  audit:
+    desc: Audits Go codes. (Shorthand for `task go:audit`)
+    cmds:
+      - task: go:audit
+
+  gen:protos:
+    desc: Generate protos.
+    cmds:
+      - echo 'Generating protos...'
+      - buf generate
+
+  run:
+    desc: Run the application in docker container.
+    deps:
+      - gen:protos
+    cmds:
+      - echo 'Running the application...'
+      - go run main.go
