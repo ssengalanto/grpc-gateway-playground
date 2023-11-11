@@ -1,0 +1,42 @@
+name: Import Swagger to Postman
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  import_to_postman:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Import Swagger to Postman
+        run: |
+          # Import the Swagger JSON into the new collection
+          SWAGGER_JSON=$(< ./gen/openapiv2/service.swagger.json)
+          CLEAN_SWAGGER_JSON=$(echo "$SWAGGER_JSON" | jq -c -M '.')
+
+          response=$(curl -X POST \
+            -H "Content-Type: application/json" \
+            -H "X-Api-Key: ${{ secrets.POSTMAN_API_KEY }}" \
+            -d "{\"type\": \"json\", \"input\": $CLEAN_SWAGGER_JSON}" \
+            "https://api.getpostman.com/import/openapi?workspace=${{ secrets.POSTMAN_WORKSPACE_ID }}")
+
+          # Print the response for debugging
+          echo "Response:"
+          echo "$response"
+
+          # Check if the response contains any error
+          if echo "$response" | grep -q '"error":'; then
+            echo "Error: The request encountered an error. Check the response for more details."
+            exit 1
+          fi
+
+          # Check the exit status of the curl command
+          if [ $? -ne 0 ]; then
+            echo "Failed to import Swagger to Postman"
+            exit 1
+          fi
