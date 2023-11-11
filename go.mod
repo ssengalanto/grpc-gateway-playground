@@ -3,7 +3,6 @@ module github.com/ssengalanto/grpc-gateway
 go 1.20
 
 require (
-	github.com/go-chi/chi v1.5.5
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.18.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20230822172742-b8732ec3820d
 	google.golang.org/grpc v1.58.0

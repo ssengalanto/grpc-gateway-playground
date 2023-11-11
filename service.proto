@@ -4,9 +4,7 @@ option go_package = "github.com/ssengalanto/grpc-gateway/service/v1";
 
 import "google/api/annotations.proto";
 
-// Here is the overall greeting service definition where we define all our endpoints
 service Greeter {
-  // Sends a greeting
   rpc SayHello (HelloRequest) returns (HelloReply) {
     option (google.api.http) = {
       post: "/v1/example/echo"
@@ -23,4 +21,24 @@ message HelloRequest {
 // The response message containing the greetings
 message HelloReply {
   string message = 1;
+}
+
+// Health service
+service Health {
+  rpc Check(HealthCheckRequest) returns (HealthCheckResponse) {
+    option (google.api.http) = {
+      get: "/health"
+    };
+  }
+
+  rpc Watch(HealthCheckRequest) returns (stream HealthCheckResponse) {
+    option (google.api.http) = {
+      get: "/watch"
+    };
+  }
+}
+
+message HealthCheckRequest {}
+message HealthCheckResponse {
+  bool serving = 1;
 }

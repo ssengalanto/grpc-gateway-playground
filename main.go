@@ -9,21 +9,33 @@ import (
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 
-	helloworldpb "github.com/ssengalanto/grpc-gateway/proto"
+	pb "github.com/ssengalanto/grpc-gateway/proto"
+	health "google.golang.org/grpc/health/grpc_health_v1"
 )
 
 type server struct {
-	helloworldpb.UnimplementedGreeterServer
+	pb.UnimplementedGreeterServer
 }
 
 func NewServer() *server {
 	return &server{}
 }
 
-func (s *server) SayHello(ctx context.Context, in *helloworldpb.HelloRequest) (*helloworldpb.HelloReply, error) {
-	return &helloworldpb.HelloReply{Message: in.Name + " world"}, nil
+func (s *server) SayHello(ctx context.Context, in *pb.HelloRequest) (*pb.HelloReply, error) {
+	return &pb.HelloReply{Message: in.Name + " world"}, nil
+}
+
+func (s *server) Check(ctx context.Context, in *health.HealthCheckRequest) (*health.HealthCheckResponse, error) {
+	return &health.HealthCheckResponse{Status: health.HealthCheckResponse_SERVING}, nil
+}
+
+func (s *server) Watch(in *health.HealthCheckRequest, _ health.Health_WatchServer) error {
+	// Example of how to register both methods but only implement the Check method.
+	return status.Error(codes.Unimplemented, "unimplemented")
 }
 
 func main() {
@@ -36,7 +48,8 @@ func main() {
 	// Create a gRPC server object
 	s := grpc.NewServer()
 	// Attach the Greeter service to the server
-	helloworldpb.RegisterGreeterServer(s, &server{})
+	pb.RegisterGreeterServer(s, &server{})
+	health.RegisterHealthServer(s, &server{})
 
 	// Serve gRPC server
 	log.Println("Serving gRPC on 0.0.0.0:8080")
@@ -58,9 +71,11 @@ func main() {
 		log.Fatalf("Failed to dial server: %v", err)
 	}
 
-	gwmux := runtime.NewServeMux()
+	healthClient := health.NewHealthClient(conn)
+
+	gwmux := runtime.NewServeMux(runtime.WithHealthzEndpoint(healthClient))
 	// Register Greeter
-	if err := helloworldpb.RegisterGreeterHandler(context.Background(), gwmux, conn); err != nil {
+	if err := pb.RegisterGreeterHandler(context.Background(), gwmux, conn); err != nil {
 		log.Fatalf("Failed to register gateway: %v", err)
 	}
 
