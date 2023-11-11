@@ -18,6 +18,7 @@ import (
 
 type server struct {
 	pb.UnimplementedGreeterServer
+	pb.UnimplementedHealthServer
 }
 
 func NewServer() *server {
@@ -97,6 +98,7 @@ func main() {
 	r.Get("/docs/*", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.StripPrefix("/docs", http.FileServer(http.Dir(swaggerDir))).ServeHTTP(w, r)
 	}))
+
 	gwServer := &http.Server{
 		Addr:    ":8090",
 		Handler: r,
