@@ -5,7 +5,11 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
+	"time"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
@@ -46,7 +50,7 @@ func main() {
 	pb.RegisterGreeterServer(s, &server{})
 	pb.RegisterHealthServer(s, &server{})
 
-	// Serve gRPC server
+	// Serve gRPC server in a separate goroutine
 	log.Println("Serving gRPC on 0.0.0.0:8080")
 	go func() {
 		if err := s.Serve(lis); err != nil {
@@ -105,7 +109,32 @@ func main() {
 	}
 
 	log.Println("Serving gRPC-Gateway on http://0.0.0.0:8090")
-	if err := gwServer.ListenAndServe(); err != nil {
-		log.Fatalf("Failed to serve gRPC-Gateway: %v", err)
+
+	// Set up a channel to receive signals
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+
+	// Run the server in a goroutine
+	go func() {
+		if err := gwServer.ListenAndServe(); err != nil {
+			log.Fatalf("Failed to serve gRPC-Gateway: %v", err)
+		}
+	}()
+
+	// Block until a signal is received
+	<-stop
+	log.Println("Shutting down server...")
+
+	// Create a context with a timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Shutdown the gRPC-Gateway server
+	if err := gwServer.Shutdown(ctx); err != nil {
+		log.Printf("Error during server shutdown: %v", err)
 	}
+
+	// Shutdown the gRPC server
+	s.GracefulStop()
+	log.Println("Server gracefully stopped")
 }
